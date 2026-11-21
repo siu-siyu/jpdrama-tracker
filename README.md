@@ -3,9 +3,10 @@
 一个跑在自己电脑上的小网站：自动抓取**日漫**和**日剧**的中文情报，每 6 小时更新一次，
 电脑和手机浏览器都能用，还能「添加到主屏幕」当 App 打开。
 
-> **想要随时随地在手机上打开、不用开着电脑？** 这里有两条路：
-> 1. **公网免费部署**（推荐）：GitHub Actions 每 6 小时自动抓数据并生成静态站，Cloudflare Pages 托管，任何网络都能访问。见 [DEPLOY.md](DEPLOY.md)，一次性配置约 10 分钟。
-> 2. **本机 + 局域网**：`start.bat` 起服务，手机连同一个 Wi-Fi 访问 `http://<电脑IP>:7788`（受 Windows 防火墙影响，见「手机打不开」一节）。
+> **线上版（已部署，随时可开）：https://siu-siyu.github.io/jpdrama-tracker/**
+> 托管在 GitHub Pages，不用开着电脑；GitHub Actions 每 6 小时自动抓数据并重新发布，见 [DEPLOY.md](DEPLOY.md)。
+>
+> 也可以本机跑：`start.bat` 起服务，同一 Wi-Fi 下手机访问 `http://<电脑IP>:7788`（受 Windows 防火墙影响，见「手机打不开」一节）。
 
 ## 它能做什么
 

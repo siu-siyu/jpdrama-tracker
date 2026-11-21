@@ -1,72 +1,88 @@
-# 部署到公网（免费，一次性配置）
+# 部署与自动更新（已上线，无需手动操作）
 
-目标：站点挂在公网上，任何设备、任何网络都能打开，**不用开着这台笔记本**，并且每 6 小时自动更新一次数据。
+线上地址：**https://siu-siyu.github.io/jpdrama-tracker/**
 
-整套方案 = GitHub 仓库（存代码和生成的 dist/）+ GitHub Actions（定时抓数据、生成静态站、自动提交）+ Cloudflare Pages（托管 dist/，全球 CDN，免费）。
+站点完全托管在 GitHub Pages 上：不用开这台笔记本、不用公网 IP、不用域名，全球可访问（国内一般也能打开，偶尔慢）。数据每 6 小时由 GitHub Actions 自动重新抓取并重新发布。
+
+仓库：https://github.com/siu-siyu/jpdrama-tracker
 
 ---
 
-## 一、把代码推到 GitHub（约 3 分钟）
+## 一、它是怎么跑的
 
-1. 打开 https://github.com/new ，仓库名填 `jpdrama-tracker`，**Private（私有）也可以**，不要勾选任何 README / .gitignore 模板，点 Create repository。
-2. 在这个项目目录（D:\工作文档\jpdrama-tracker）打开命令行，执行（把 `<你的用户名>` 换成 GitHub 用户名）：
-
-```bash
-git remote add origin https://github.com/<你的用户名>/jpdrama-tracker.git
-git branch -M main
-git push -u origin main
+```
+GitHub Actions（cron 17 */6 * * *，即每 6 小时的 :17）
+  └─ node scripts/build-static.mjs --fetch
+       ├─ 抓豆瓣列表 + 详情（data/cache.json、data/details.json，跨次复用）
+       ├─ 解析 B 站分集（data/episodes.json，随仓库提交，见下方说明）
+       ├─ 封面下载进 dist/covers/
+       └─ 生成 dist/（静态站，含 data.json）
+  └─ actions/upload-pages-artifact + actions/deploy-pages
+       └─ 发布到 https://siu-siyu.github.io/jpdrama-tracker/
 ```
 
-3. 推送时会要求登录：弹出浏览器就点授权；如果在命令行要密码，请填 **Personal Access Token**（https://github.com/settings/tokens 生成，勾选 repo 权限），不是账号密码。
+关键文件：
 
-> 仓库里已经包含 `dist/`（14MB，160 部剧的静态站 + 封面），所以推上去之后 Cloudflare 马上就能用。
+- `.github/workflows/update.yml`：定时任务本体，改 `cron` 即可改频率。
+- `scripts/build-static.mjs`：抓数据 + 烘焙分集 + 下载封面 + 导出 `dist/`。
+- `scripts/gh-deploy.mjs`：把本机源码推上仓库并触发一次构建（本机网络访问 github.com 的 git 协议被污染，只能用 api.github.com 上传）。
+- `scripts/gh-auth.mjs`：GitHub 设备码登录，token 存在 `data/.gh-token`（已 gitignore）。
 
-## 二、在 Cloudflare Pages 建站（约 3 分钟）
+## 二、关于 B 站分集（重要）
 
-1. 注册 / 登录 https://dash.cloudflare.com （免费账号即可，不要求有域名）。
-2. 左侧选 **Workers & Pages** → **Create** → 选 **Pages** → **Connect to Git**。
-3. 授权 GitHub，选中刚才的 `jpdrama-tracker` 仓库，点 Begin setup。
-4. 构建设置这样填：
-   - Project name：`jpdrama`（决定网址 `https://jpdrama.pages.dev`，可自定义）
-   - Production branch：`main`
-   - Framework preset：**None**
-   - Build command：**留空**
-   - Build output directory：`dist`
-5. 点 **Save and Deploy**，等 1 分钟，访问 `https://<项目名>.pages.dev`。
+GitHub 的服务器在美国，访问 `api.bilibili.com` 会被风控拦截（日志里的 `412`），所以**Actions 里解析不到任何分集**。
 
-之后每次仓库有新的提交，Cloudflare 会自动重新部署，无需再操作。
+解决办法：把本机解析好的结果 `data/episodes.json` 提交进仓库，构建时直接命中缓存
+（`BILI_TTL_DAYS=365`、`BILI_TTL_MISS_HOURS=720` 在 workflow 里设置，避免缓存过期后去撞 412）。
 
-## 三、打开自动更新（约 1 分钟）
+后果与限制：
 
-1. 进 GitHub 仓库 → **Settings** → **Actions** → **General** → 找到 *Workflow permissions*，选 **Read and write permissions** → Save。（否则定时任务无法把新数据提交回仓库）
-2. 进 **Actions** 标签页 → 左侧 *刷新放送数据* → 右侧 **Run workflow** 手动跑一次，确认是绿勾。
-3. 之后它按 `.github/workflows/update.yml` 里的 `cron: "17 */6 * * *"`（每 6 小时）自动跑：抓豆瓣 → 解析 B 站分集 → 重新生成 dist/ → 提交 → Cloudflare 自动部署。
-
-想改频率就改那行 cron（UTC 时间）：`"17 */3 * * *"` 是每 3 小时，`"17 20 * * *"` 是每天北京时间 04:17 一次。
-
-## 四、验证与常见问题
-
-**先看 Actions 日志里有没有 `warnings`**：GitHub 的服务器在美国，豆瓣有可能对境外 IP 限流。手动 Run 一次后：
-
-- 绿勾 + 日志里 `anime 80 / drama 80` → 一切正常。
-- 红叉，报 `豆瓣列表请求失败` → 境外 IP 被拦。此时有两个选择：
-  1. 在本机跑 `node scripts/build-static.mjs --fetch`，然后 `git add -A dist && git commit -m update && git push`（笔记本开着的时候手动更新）；
-  2. 把 workflow 里的抓取步骤换成走你自己的代理（改 `fetchJSON` 的 `proxy` 参数）。
-- Cloudflare 部署成功但页面空白 → 检查 Build output directory 是否真的填了 `dist`（不是 `/dist`、不是 `public`）。
-
-**国内访问 pages.dev 有时慢或被墙**：在 Cloudflare Pages 项目里 **Custom domains** 绑定自己的域名（阿里云/腾讯云买的域名都行，把 DNS 交给 Cloudflare 即可），访问会稳定很多。
-
-**手机上装成 App**：用手机浏览器打开站点 → 分享/菜单 → 「添加到主屏幕」，图标和全屏体验与原生 App 一致。安卓也可以用项目里的 `app.apk`，但那个壳指向局域网地址，公网版建议直接用「添加到主屏幕」。
-
-## 五、本地预览静态站
+- 站点的「点开就能看」覆盖范围 = 本机最后一次扫描的结果（目前 5 部）。
+- 豆瓣数据（新剧上架、评分、简介、放送进度）仍然每 6 小时自动更新。
+- 想让新剧也能直接看：在这台机器上跑一次
 
 ```bash
-node scripts/build-static.mjs        # 用本地缓存生成 dist/
-node scripts/serve-dist.mjs          # http://127.0.0.1:7799
+node scripts/scan-all-sources.mjs      # 重新扫全部条目，更新 data/episodes.json
+node scripts/gh-deploy.mjs             # 推上去并触发构建（约 5~8 分钟）
 ```
 
-加了 `--fetch` 会先联网刷新豆瓣数据再生成。
+## 三、常见操作
 
-## 六、成本
+**手动触发一次更新**
 
-GitHub 私有仓库 + Actions（每月 2000 分钟，本站每次约 5 分钟，6 小时一次 ≈ 每月 600 分钟）+ Cloudflare Pages（免费额度：每月 500 次构建、无限带宽）。**0 元**。
+GitHub 仓库 → Actions → 「刷新放送数据并发布到 GitHub Pages」→ Run workflow。
+
+**改更新频率**
+
+编辑 `.github/workflows/update.yml` 的 `cron: "17 */6 * * *"`（UTC）：
+
+- `"17 */3 * * *"` 每 3 小时
+- `"17 20 * * *"` 每天北京时间 04:17 一次
+
+**本地预览线上效果**
+
+```bash
+node scripts/build-static.mjs --fetch   # 生成 dist/
+node scripts/serve-dist.mjs             # http://127.0.0.1:7799
+```
+
+**本地开发（动态版，带 /api/refresh）**
+
+```bash
+node server.mjs                          # http://127.0.0.1:7788
+```
+
+## 四、排错
+
+| 现象 | 原因 / 处理 |
+| --- | --- |
+| Actions 红叉，日志报豆瓣请求失败 | 豆瓣对境外 IP 限流；等下一次 cron 或在本机 `--fetch` 后手动推 |
+| 站点打开是空白页 | 检查 `dist/index.html` 是否注入了 `window.__STATIC__ = true`，以及资源路径是否为 `./` 相对路径 |
+| 有剧却没有分集按钮 | 该剧 B 站没有正版片源，或本机缓存里是未命中记录 |
+| 封面空白 | `dist/covers/` 缺图（豆瓣图床 418），重新跑一次构建即可 |
+| 手机上打开是旧版本 | 页面注册了 `sw.js` 离线缓存；下拉刷新或清一次站点数据 |
+
+## 五、手机上装成 App
+
+- **安卓**：项目里的 `public/app.apk` 是 WebView 壳，默认指向局域网地址，长按页面可改地址；公网版把地址改成 https://siu-siyu.github.io/jpdrama-tracker/ 即可。
+- **iPhone / 鸿蒙**：用浏览器打开线上地址 → 分享 → 「添加到主屏幕」，图标和全屏体验与原生 App 一致。

@@ -8,8 +8,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
 const CACHE_FILE = path.join(ROOT, "data", "episodes.json");
-const TTL_OK = 3 * 86400000;       // 查到的结果缓存 3 天
-const TTL_MISS = 12 * 3600000;     // 没查到 12 小时后再试
+const TTL_OK = Number(process.env.BILI_TTL_DAYS || 3) * 86400000;        // 查到的结果缓存 3 天
+const TTL_MISS = Number(process.env.BILI_TTL_MISS_HOURS || 12) * 3600000;  // 没查到 12 小时后再试
 const MIN_GAP = 600;               // 两次 B 站请求之间的间隔，避免被风控
 
 let chain = Promise.resolve();

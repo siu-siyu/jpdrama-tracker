@@ -37,7 +37,11 @@ async function walk(dir, base = ROOT) {
     const full = path.join(dir, ent.name);
     const rel = path.relative(base, full).split(path.sep).join("/");
     if (ent.isDirectory()) {
-      if (SKIP_DIRS.has(ent.name) || rel.startsWith("dist")) continue;
+      if (SKIP_DIRS.has(ent.name) || rel.startsWith("dist")) {
+        // B 站分集缓存要进仓库：runner 访问 B 站会被风控 412，只能沿用本机解析结果
+        if (rel === "data") out.push({ full: path.join(full, "episodes.json"), rel: "data/episodes.json" });
+        continue;
+      }
       out.push(...(await walk(full, base)));
     } else {
       if (SKIP_EXT.has(path.extname(ent.name))) continue;

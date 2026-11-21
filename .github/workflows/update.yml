@@ -25,14 +25,21 @@ jobs:
         with:
           node-version: 20
 
-      - name: 复用上次的抓取缓存（B 站分集解析很慢）
+      - name: 复用上次的抓取缓存（豆瓣详情 / 列表）
         uses: actions/cache@v4
         with:
-          path: data
+          path: |
+            data/cache.json
+            data/details.json
           key: tracker-cache-${{ github.run_id }}
           restore-keys: tracker-cache-
 
+      # 注意：data/episodes.json 是提交进仓库的（B 站分集解析结果），
+      # 不能用 actions/cache 覆盖它 —— runner 的 IP 访问 B 站会被风控 412。
       - name: 抓豆瓣 + 解析 B 站分集 + 导出静态站
+        env:
+          BILI_TTL_DAYS: "365"
+          BILI_TTL_MISS_HOURS: "720"
         run: node scripts/build-static.mjs --fetch
 
       - uses: actions/upload-pages-artifact@v3
