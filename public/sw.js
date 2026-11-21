@@ -1,5 +1,5 @@
 // 极简 Service Worker：外壳走缓存，数据永远取最新
-const CACHE = "jp-tracker-v4";
+const CACHE = "jp-tracker-v5";
 // 必须用相对路径：站点部署在 https://<user>.github.io/<repo>/ 子路径下，
 // 写成 "/"、"/app.js" 会解析到域名根目录并 404，导致 install 直接失败。
 const SHELL = ["./", "./style.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
@@ -26,18 +26,17 @@ self.addEventListener("fetch", (event) => {
   // 静态站的 data.json 每次都要取最新的（否则自动更新对老用户永远不生效）
   if (url.pathname.endsWith("/data.json")) return;
 
+  // 网络优先：先拿最新外壳，离线或断网时才回退到缓存。
+  // （以前是缓存优先，导致发版后老用户一直看旧的 app.js/index.html）
   event.respondWith(
-    caches.match(event.request).then((hit) => {
-      const network = fetch(event.request)
-        .then((res) => {
-          if (res.ok && res.type === "basic") {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(event.request, copy));
-          }
-          return res;
-        })
-        .catch(() => hit);
-      return hit || network;
-    })
+    fetch(event.request)
+      .then((res) => {
+        if (res.ok && res.type === "basic") {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(event.request, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(event.request).then((hit) => hit || caches.match("./")))
   );
 });
