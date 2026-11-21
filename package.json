@@ -1,0 +1,17 @@
+{
+  "name": "jpdrama-tracker",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "日漫 / 日剧 中文情报站：豆瓣数据、定期自动更新、手机可用（PWA）",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "test": "node tests/render-smoke.mjs",
+    "icons": "node scripts/gen-icons.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,50 @@
+name: 刷新放送数据并发布到 GitHub Pages
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # 每 6 小时（UTC 17 分）
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 复用上次的抓取缓存（B 站分集解析很慢）
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: tracker-cache-${{ github.run_id }}
+          restore-keys: tracker-cache-
+
+      - name: 抓豆瓣 + 解析 B 站分集 + 导出静态站
+        run: node scripts/build-static.mjs --fetch
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

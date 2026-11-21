@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>追番日剧 · 日漫日剧中文情报站</title>
+    <meta name="description" content="自动更新的日漫与日剧中文情报：中文剧名、评分、简介，附豆瓣与 B 站观看入口，手机可用。" />
+    <meta name="theme-color" content="#0b0c11" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="追番日剧" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot" id="statusDot"></span>
+        <div>
+          <h1>追番日剧</h1>
+          <p id="statusText">加载中…</p>
+        </div>
+      </div>
+      <button id="refreshBtn" class="icon-btn" title="立即刷新" aria-label="立即刷新">⟳</button>
+    </header>
+
+    <div class="searchbar">
+      <input id="search" type="search" placeholder="搜剧名 / 原名 / 演员" autocomplete="off" />
+      <select id="sort" aria-label="排序">
+        <option value="date">最近开播</option>
+        <option value="rating">评分最高</option>
+        <option value="votes">评分人数</option>
+      </select>
+    </div>
+
+    <nav class="chips" id="chips">
+      <button class="chip is-on" data-filter="all">全部</button>
+      <button class="chip" data-filter="fresh">近期开播</button>
+      <button class="chip" data-filter="good">8 分以上</button>
+      <button class="chip" data-filter="playable">▶ 能直接看</button>
+      <button class="chip" data-filter="follow">我的追番</button>
+    </nav>
+
+    <section id="todayBox" class="today" hidden>
+      <h2 class="today-head">今天更新 <span id="todayCount" class="today-count"></span></h2>
+      <div id="todayRow" class="today-row"></div>
+    </section>
+
+    <main>
+      <section id="grid" class="grid" aria-live="polite"></section>
+      <p id="empty" class="empty" hidden>没有匹配的条目，换个词试试。</p>
+    </main>
+
+    <footer class="foot">
+      <p>数据来自豆瓣，每 <span id="hours">6</span> 小时自动更新一次。</p>
+      <p id="lanHint" class="lan" hidden></p>
+      <p><a class="apk-link" href="./app.apk" download>下载安卓 App（APK）</a></p>
+    </footer>
+
+    <nav class="tabbar">
+      <button class="tab is-on" data-tab="anime">日漫</button>
+      <button class="tab" data-tab="drama">日剧</button>
+      <button class="tab" data-tab="follow">追番</button>
+    </nav>
+
+    <div id="sheet" class="sheet" hidden>
+      <div class="sheet-backdrop" data-close></div>
+      <div class="sheet-panel" role="dialog" aria-modal="true">
+        <button class="sheet-close" data-close aria-label="关闭">✕</button>
+        <div id="sheetBody"></div>
+      </div>
+    </div>
+
+    <div id="player" class="player" hidden>
+      <div class="player-panel" role="dialog" aria-modal="true">
+        <div class="player-bar">
+          <span id="playerTitle">播放中</span>
+          <button class="player-close" id="playerClose" aria-label="关闭播放">✕</button>
+        </div>
+        <div class="player-frame">
+          <iframe id="playerFrame" title="剧集播放" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="no-referrer"></iframe>
+        </div>
+        <div class="player-foot">
+          <a id="playerOpen" target="_blank" rel="noreferrer">在 B 站打开这一集 →</a>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

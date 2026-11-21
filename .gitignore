@@ -1,0 +1,11 @@
+data/
+dist/
+node_modules/
+.chrome/
+.edge-profile*/
+shot-*.png
+_shot.png
+*.log
+.tools/
+*.idsig
+.venv/
