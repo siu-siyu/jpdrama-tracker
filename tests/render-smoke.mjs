@@ -77,7 +77,7 @@ class El {
   get innerHTML() { return ""; }
 }
 
-const ids = ["grid", "empty", "statusText", "statusDot", "refreshBtn", "search", "sort", "chips", "sheet", "sheetBody", "hours", "lanHint", "player", "playerFrame", "playerTitle", "playerOpen", "playerClose"];
+const ids = ["grid", "empty", "statusText", "statusDot", "refreshBtn", "search", "sort", "chips", "sheet", "sheetBody", "hours", "lanHint", "player", "playerFrame", "playerTitle", "playerOpen", "playerClose", "todayBox", "todayRow", "todayCount", "recentBox", "recentRow", "recentCount", "newTip", "newTipText"];
 const store = new Map(ids.map((id) => [id, new El()]));
 store.get("sheet").hidden = true;
 
@@ -123,6 +123,8 @@ const responses = {
 globalThis.document = document;
 globalThis.window = { matchMedia: () => ({ matches: false }), addEventListener: () => {} };
 if (STATIC) globalThis.window.__STATIC__ = true;
+// 模拟「三天前看过一次」，用来验证「上次看之后有 N 部更新」和「新」角标
+localStorage.setItem("jp-tracker.lastvisit.v1", String(Date.now() - 3 * 86400000));
 globalThis.localStorage = localStorage;
 globalThis.location = { hostname: "127.0.0.1", href: "http://127.0.0.1:7788/" };
 Object.defineProperty(globalThis, "navigator", { value: { userAgent: "node" }, configurable: true });
@@ -147,6 +149,13 @@ check("日漫标签渲染卡片", grid.children.length === cache.anime.length, g
 const firstTitle = grid.children[0]?.children[1]?.children[0]?.textContent;
 check("卡片标题取最新开播", Boolean(firstTitle), String(firstTitle));
 
+const recentRow = store.get("recentRow");
+check("最近更新橱窗有内容", store.get("recentBox").hidden === false && recentRow.children.length > 0, String(recentRow.children.length));
+const newTipText = String(store.get("newTipText").textContent || "");
+check("打开时提示上次看之后有更新", store.get("newTip").hidden === false && /\d+ 部更新/.test(newTipText), newTipText);
+const tagged = grid.children.filter((c) => c.children[0].children.some((n) => n.className && String(n.className).includes("new-tag"))).length;
+check("最近更新的卡片带「新」角标", tagged > 0, String(tagged));
+
 const search = store.get("search");
 search.dispatch("input", { target: { value: cache.anime[0].title.slice(0, 2) } });
 check("搜索过滤生效", grid.children.length >= 1 && grid.children.length < cache.anime.length, String(grid.children.length));
@@ -168,9 +177,10 @@ check("剧集区显示已播进度", /已播 \d+ \/ 共 \d+ 集/.test(epsHead?.c
 const epsInner = epsBody?.children?.[1]?.children?.[0];
 check("剧集区有兜底提示", /B 站上架/.test(epsInner?.textContent || ""), String(epsInner?.textContent || ""));
 
-const star = grid.children[0].children[0].children.at(-1);
+const firstCard = grid.children[0];
+const star = firstCard.querySelectorAll(".star")[0];
 star.dispatch("click");
-check("收藏写入 localStorage", (localStorage.getItem("jp-tracker.follows.v2") || "").includes(cache.drama[0].id));
+check("收藏写入 localStorage", (localStorage.getItem("jp-tracker.follows.v2") || "").includes(firstCard.dataset.id), firstCard.dataset.id);
 
 const followTab = tabs.find((t) => t.dataset.tab === "follow");
 followTab.dispatch("click");

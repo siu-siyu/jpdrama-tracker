@@ -1,5 +1,6 @@
 // 前端：中文追番列表 + 详情弹层 + 本地追番收藏
 const FOLLOW_KEY = "jp-tracker.follows.v2";
+const LASTVISIT_KEY = "jp-tracker.lastvisit.v1";
 const REFRESH_MS = 10 * 60 * 1000;
 // 静态部署（Cloudflare Pages 等）时由构建脚本注入 window.__STATIC__ = true
 const STATIC = Boolean(window.__STATIC__);
@@ -10,8 +11,10 @@ const state = {
   filter: "all",
   playable: new Set(),
   q: "",
-  sort: "date",
+  sort: "updated",
   follows: new Set(JSON.parse(localStorage.getItem(FOLLOW_KEY) || "[]")),
+  lastVisit: Number(localStorage.getItem(LASTVISIT_KEY) || 0),
+  visitSaved: false,
 };
 
 const el = {
@@ -35,6 +38,11 @@ const el = {
   todayBox: document.getElementById("todayBox"),
   todayRow: document.getElementById("todayRow"),
   todayCount: document.getElementById("todayCount"),
+  recentBox: document.getElementById("recentBox"),
+  recentRow: document.getElementById("recentRow"),
+  recentCount: document.getElementById("recentCount"),
+  newTip: document.getElementById("newTip"),
+  newTipText: document.getElementById("newTipText"),
 };
 
 if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
@@ -73,6 +81,7 @@ function visibleItems() {
   if (state.filter === "fresh") list = list.filter(isFresh);
   if (state.filter === "good") list = list.filter((x) => x.rating >= 8);
   if (state.filter === "playable") list = list.filter((x) => state.playable.has(keyOf(x)));
+  if (state.filter === "recent") list = list.filter((x) => recentUpdates(7).some((r) => r.item === x));
 
   if (q) {
     list = list.filter((x) =>
@@ -86,6 +95,7 @@ function visibleItems() {
   const sorted = list.slice();
   if (state.sort === "rating") sorted.sort((a, b) => b.rating - a.rating);
   else if (state.sort === "votes") sorted.sort((a, b) => b.votes - a.votes);
+  else if (state.sort === "updated") sorted.sort((a, b) => (lastEpInfo(b)?.at || 0) - (lastEpInfo(a)?.at || 0));
   else sorted.sort((a, b) => (b.pubdate || "").localeCompare(a.pubdate || ""));
   return sorted;
 }
@@ -162,6 +172,16 @@ function makeCard(item) {
     cover.appendChild(play);
   }
 
+  // 最近一集是在「上次打开」之后播出的，标一个「新」
+  const le = lastEpInfo(item);
+  if (le && state.lastVisit > 0 && le.at > state.lastVisit) {
+    const nt = document.createElement("span");
+    nt.className = "new-tag";
+    nt.textContent = "新";
+    nt.title = "第 " + le.n + " 集 · " + agoCN(le.at);
+    cover.appendChild(nt);
+  }
+
   const body = document.createElement("div");
   body.className = "body";
   const title = document.createElement("p");
@@ -181,6 +201,76 @@ function makeCard(item) {
     }
   });
   return card;
+}
+
+// 「最近一集」的时间：豆瓣只给首播日和总集数，按每周一集推算
+function lastEpInfo(item) {
+  const p = airProgress(item);
+  if (!p) return null;
+  const start = Date.parse(item.pubdate);
+  if (!Number.isFinite(start)) return null;
+  return { n: p.aired, at: start + (p.aired - 1) * 7 * 86400000 };
+}
+
+// 相对时间：刚刚 / N 小时前 / 今天 / 昨天 / N 天前
+function agoCN(ts) {
+  const now = Date.now();
+  const diff = now - ts;
+  if (diff < 0) return "即将播出";
+  if (diff < 3600000) return Math.max(1, Math.round(diff / 60000)) + " 分钟前";
+  if (diff < 8 * 3600000) return Math.round(diff / 3600000) + " 小时前";
+  const d0 = new Date();
+  d0.setHours(0, 0, 0, 0);
+  if (ts >= d0.getTime()) return "今天";
+  if (ts >= d0.getTime() - 86400000) return "昨天";
+  return Math.round((d0.getTime() - ts) / 86400000) + " 天前";
+}
+
+// 最近 N 天内有新一集播出的剧，按最新一集的时间倒序
+function recentUpdates(days = 7) {
+  const d = state.data;
+  if (!d) return [];
+  const from = Date.now() - days * 86400000;
+  const out = [];
+  for (const item of [...d.anime, ...d.drama]) {
+    const le = lastEpInfo(item);
+    if (!le || le.at < from) continue;
+    out.push({ item: item, ep: le.n, at: le.at });
+  }
+  out.sort((a, b) => b.at - a.at);
+  return out;
+}
+
+function renderRecent() {
+  if (!el.recentBox || !el.recentRow) return;
+  const list = recentUpdates(7);
+  el.recentBox.hidden = list.length === 0;
+  if (!list.length) return;
+  const fresh = state.lastVisit > 0 ? list.filter((r) => r.at > state.lastVisit).length : 0;
+  if (el.recentCount) el.recentCount.textContent = list.length + " 部" + (fresh ? "（其中 " + fresh + " 部是新的）" : "");
+  const frag = document.createDocumentFragment();
+  for (const row of list.slice(0, 40)) {
+    const b = document.createElement("button");
+    b.className = "today-card" + (state.lastVisit > 0 && row.at > state.lastVisit ? " is-new" : "");
+    const t = document.createElement("span");
+    t.className = "today-title";
+    t.textContent = row.item.title;
+    const s = document.createElement("span");
+    s.className = "today-sub";
+    s.textContent = "第 " + row.ep + " 集 · " + agoCN(row.at) + " · " + (row.item.kind === "anime" ? "日漫" : "日剧");
+    b.append(t, s);
+    b.addEventListener("click", () => openSheet(row.item));
+    frag.appendChild(b);
+  }
+  el.recentRow.replaceChildren(frag);
+}
+
+// 打开页面时的提醒条：上次看过之后又更新了几部
+function renderNewTip() {
+  if (!el.newTip) return;
+  const n = state.data && state.lastVisit > 0 ? recentUpdates(7).filter((r) => r.at > state.lastVisit).length : 0;
+  el.newTip.hidden = n === 0;
+  if (el.newTipText) el.newTipText.textContent = "上次看之后有 " + n + " 部更新了 · 点这里只看这些";
 }
 
 // 今天要更新的剧集：按开播日 + 每周一集推算，取落点在今天的
@@ -235,7 +325,17 @@ function render() {
       ? "还没有追番：点卡片右上角的 ★ 收藏。"
       : "没有匹配的条目，换个词试试。";
   renderStatus();
+  renderRecent();
+  renderNewTip();
   renderToday();
+  if (state.data && !state.visitSaved) {
+    state.visitSaved = true;
+    try {
+      localStorage.setItem(LASTVISIT_KEY, String(Date.now()));
+    } catch {
+      /* 隐私模式下写不了，忽略 */
+    }
+  }
 }
 
 function renderStatus() {
@@ -614,6 +714,15 @@ el.sort.addEventListener("change", (e) => {
 });
 
 el.refreshBtn.addEventListener("click", () => loadData(true));
+
+// 提醒条：点一下只看上次看之后更新的那几部
+if (el.newTip) {
+  el.newTip.addEventListener("click", () => {
+    state.filter = "recent";
+    el.chips.querySelectorAll(".chip").forEach((c) => c.classList.toggle("is-on", c.dataset.filter === "recent"));
+    render();
+  });
+}
 
 loadData(false);
 loadPlayable();

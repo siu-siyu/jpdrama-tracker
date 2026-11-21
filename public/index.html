@@ -35,6 +35,7 @@
     <div class="searchbar">
       <input id="search" type="search" placeholder="搜剧名 / 原名 / 演员" autocomplete="off" />
       <select id="sort" aria-label="排序">
+        <option value="updated" selected>最近更新</option>
         <option value="date">最近开播</option>
         <option value="rating">评分最高</option>
         <option value="votes">评分人数</option>
@@ -43,11 +44,22 @@
 
     <nav class="chips" id="chips">
       <button class="chip is-on" data-filter="all">全部</button>
+      <button class="chip" data-filter="recent">🆕 最近更新</button>
       <button class="chip" data-filter="fresh">近期开播</button>
       <button class="chip" data-filter="good">8 分以上</button>
       <button class="chip" data-filter="playable">▶ 能直接看</button>
       <button class="chip" data-filter="follow">我的追番</button>
     </nav>
+
+    <button id="newTip" class="newtip" hidden>
+      <span id="newTipText"></span>
+      <span class="newtip-go">只看这些 →</span>
+    </button>
+
+    <section id="recentBox" class="today" hidden>
+      <h2 class="today-head">最近更新（7 天内） <span id="recentCount" class="today-count"></span></h2>
+      <div id="recentRow" class="today-row"></div>
+    </section>
 
     <section id="todayBox" class="today" hidden>
       <h2 class="today-head">今天更新 <span id="todayCount" class="today-count"></span></h2>
