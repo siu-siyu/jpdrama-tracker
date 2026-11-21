@@ -122,9 +122,12 @@ function makeCard(item) {
     img.decoding = "async";
     img.referrerPolicy = "no-referrer";
     img.alt = item.title;
-    img.src = coverSrc(item);
+    // 监听必须在赋值 src 之前：Safari 对内存缓存图片会在赋值时同步触发 load，
+    // 之后再挂监听就永远收不到，图片会一直停在 opacity:0（看起来像没有封面）。
     img.addEventListener("load", () => img.classList.add("loaded"));
     img.addEventListener("error", () => img.remove());
+    img.src = coverSrc(item);
+    if (img.complete && img.naturalWidth) img.classList.add("loaded");
     cover.appendChild(img);
   }
 

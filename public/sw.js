@@ -1,6 +1,8 @@
 // 极简 Service Worker：外壳走缓存，数据永远取最新
-const CACHE = "jp-tracker-v3";
-const SHELL = ["/", "/style.css", "/app.js", "/manifest.webmanifest", "/icon.svg"];
+const CACHE = "jp-tracker-v4";
+// 必须用相对路径：站点部署在 https://<user>.github.io/<repo>/ 子路径下，
+// 写成 "/"、"/app.js" 会解析到域名根目录并 404，导致 install 直接失败。
+const SHELL = ["./", "./style.css", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

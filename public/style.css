@@ -225,9 +225,10 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.3s ease;
 }
+/* 不再用 opacity 做入场：任何加载事件丢失（Safari 缓存、SW 命中）都会让封面彻底不可见 */
 .card .cover img.loaded { opacity: 1; }
 .card .fallback {
   position: absolute;
